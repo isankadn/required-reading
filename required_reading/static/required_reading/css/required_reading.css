@@ -1,6 +1,6 @@
 :root {
-  --rr-primary: #1769aa;
-  --rr-primary-dark: #0f4f82;
+  --rr-primary: #a85566;
+  --rr-primary-dark: #8f3f51;
   --rr-success: #177245;
   --rr-danger: #b42318;
   --rr-border: #d8dee8;
@@ -21,6 +21,14 @@
 .rr-container {
   margin: 0 auto;
   max-width: 1120px;
+}
+
+.rr-management-menu {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin: 0 0 18px;
 }
 
 .rr-hero,
@@ -112,8 +120,18 @@
 .rr-button:hover { text-decoration: none; transform: translateY(-1px); }
 .rr-button-primary { background: var(--rr-primary); color: #fff; }
 .rr-button-primary:hover { background: var(--rr-primary-dark); color: #fff; }
-.rr-button-secondary { background: #eef5fb; color: var(--rr-primary-dark); }
-.rr-button-danger { background: #fee4e2; color: var(--rr-danger); }
+.rr-button-secondary {
+  background: #fff;
+  border: 1px solid var(--rr-primary);
+  color: var(--rr-primary);
+}
+.rr-button-secondary:hover { background: #fff7f9; color: var(--rr-primary-dark); }
+.rr-button-danger {
+  background: #fff;
+  border: 1px solid var(--rr-primary);
+  color: var(--rr-primary);
+}
+.rr-button-danger:hover { background: #fff7f9; color: var(--rr-primary-dark); }
 
 .rr-sticky-actions { bottom: 18px; margin-top: 22px; padding: 16px; position: sticky; text-align: right; z-index: 3; }
 .rr-panel { margin-bottom: 22px; padding: 24px; }
@@ -170,6 +188,8 @@
 
 @media (max-width: 800px) {
   .rr-hero, .rr-document-card, .rr-card-actions { align-items: stretch; flex-direction: column; }
+  .rr-management-menu { align-items: stretch; flex-direction: column; }
+  .rr-management-menu .rr-button { width: 100%; }
   .rr-progress-card { flex-basis: auto; }
   .rr-card-actions { align-items: stretch; }
   .rr-manage-item { grid-template-columns: 1fr; }

@@ -43,6 +43,23 @@ def test_staff_user_can_access_management(client):
     assert response.status_code == 200
 
 
+def test_staff_user_sees_document_management_menu_on_document_page(client):
+    user = create_user(username="staff", is_staff=True)
+    client.force_login(user)
+    response = client.get(reverse("required_reading:document_list"))
+    assert response.status_code == 200
+    assert b"Document management" in response.content
+    assert b"rr-management-menu" in response.content
+
+
+def test_regular_user_does_not_see_document_management_menu(client):
+    user = create_user()
+    client.force_login(user)
+    response = client.get(reverse("required_reading:document_list"))
+    assert response.status_code == 200
+    assert b"Document management" not in response.content
+
+
 def test_user_can_save_own_acknowledgement(client):
     user = create_user()
     document = RequiredReadingDocument.objects.create(title="Policy", pdf_file=make_pdf())

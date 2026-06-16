@@ -18,7 +18,7 @@ from .models import (
     RequiredReadingDocument,
     RequiredReadingSettings,
 )
-from .permissions import staff_required
+from .permissions import is_required_reading_manager, staff_required
 
 
 @login_required
@@ -52,6 +52,8 @@ def document_list(request):
             "document_count": len(documents),
             "acknowledged_count": acknowledged_count,
             "pending_count": max(len(documents) - acknowledged_count, 0),
+            "can_manage_required_reading": is_required_reading_manager(request.user),
+            "required_reading_active_page": "documents",
         },
     )
 
@@ -95,6 +97,8 @@ def manage_documents(request):
             "settings_form": settings_form,
             "document_forms": document_forms,
             "documents": RequiredReadingDocument.objects.all(),
+            "can_manage_required_reading": True,
+            "required_reading_active_page": "manage",
         },
     )
 
