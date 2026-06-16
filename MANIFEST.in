@@ -1,0 +1,5 @@
+recursive-include required_reading/templates *
+recursive-include required_reading/static *
+recursive-include required_reading/migrations *
+include README.md
+include REQUIREMENTS.md

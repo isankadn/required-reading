@@ -1,0 +1,37 @@
+{% extends "required_reading/base.html" %}
+{% load i18n %}
+
+{% block required_reading_content %}
+<section class="rr-hero">
+  <div>
+    <p class="rr-eyebrow">{% trans "Required Reading" %}</p>
+    <h1>{% trans "Documents to review" %}</h1>
+    <div class="rr-intro">{{ settings_obj.intro_text|linebreaks }}</div>
+  </div>
+  <div class="rr-progress-card" aria-label="{% trans 'Reading acknowledgement progress' %}">
+    <strong>{{ acknowledged_count }}/{{ document_count }}</strong>
+    <span>{% trans "confirmed" %}</span>
+    <div class="rr-progress-track"><span style="width: {% if document_count %}{% widthratio acknowledged_count document_count 100 %}{% else %}0{% endif %}%"></span></div>
+    <small>{{ pending_count }} {% trans "pending" %}</small>
+  </div>
+</section>
+
+{% if document_rows %}
+<form method="post" action="{% url 'required_reading:save_acknowledgements' %}" class="rr-document-form">
+  {% csrf_token %}
+  <div class="rr-document-grid">
+    {% for row in document_rows %}
+      {% include "required_reading/partials/document_card.html" with row=row %}
+    {% endfor %}
+  </div>
+  <div class="rr-sticky-actions">
+    <button type="submit" class="rr-button rr-button-primary">{% trans "Save confirmations" %}</button>
+  </div>
+</form>
+{% else %}
+  <div class="rr-empty-state">
+    <h2>{% trans "No required reading documents are available yet." %}</h2>
+    <p>{% trans "Please check again later." %}</p>
+  </div>
+{% endif %}
+{% endblock %}

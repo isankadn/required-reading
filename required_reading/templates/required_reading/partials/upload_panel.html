@@ -1,0 +1,25 @@
+{% load i18n %}
+<section class="rr-panel rr-upload-panel">
+  <div class="rr-panel-heading">
+    <div>
+      <h2>{% trans "Upload PDFs" %}</h2>
+      <p>{% trans "Drag PDF files here or select multiple files from your computer." %}</p>
+    </div>
+  </div>
+
+  <form id="rr-upload-form" method="post" enctype="multipart/form-data" action="{% url 'required_reading:upload_documents' %}">
+    {% csrf_token %}
+    <label id="rr-drop-zone" class="rr-drop-zone" for="rr-file-input">
+      <span class="rr-drop-icon" aria-hidden="true">⇧</span>
+      <strong>{% trans "Drop PDF files here" %}</strong>
+      <span>{% trans "or click to browse" %}</span>
+      <input id="rr-file-input" type="file" name="files" accept="application/pdf,.pdf" multiple>
+    </label>
+    <div class="rr-upload-actions">
+      <button type="submit" class="rr-button rr-button-primary">{% trans "Upload selected PDFs" %}</button>
+      <span id="rr-upload-summary" class="rr-upload-summary" aria-live="polite"></span>
+    </div>
+  </form>
+
+  <div id="rr-upload-list" class="rr-upload-list" aria-live="polite"></div>
+</section>

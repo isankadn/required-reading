@@ -1,0 +1,22 @@
+{% load i18n %}
+<article class="rr-document-card{% if row.is_acknowledged %} is-complete{% endif %}">
+  <div class="rr-card-main">
+    <div class="rr-file-icon" aria-hidden="true">PDF</div>
+    <div>
+      <h2>{{ row.document.title }}</h2>
+      <p class="rr-file-meta">{% trans "Uploaded" %}: {{ row.document.created_at|date:"M j, Y" }}</p>
+    </div>
+  </div>
+  <div class="rr-card-actions">
+    <a class="rr-button rr-button-secondary" href="{{ row.document.pdf_file.url }}" target="_blank" rel="noopener noreferrer">
+      {% trans "Open PDF" %}
+    </a>
+    <label class="rr-checkbox-row">
+      <input type="checkbox" name="acknowledged_documents" value="{{ row.document.id }}" {% if row.is_acknowledged %}checked{% endif %}>
+      <span>{% trans "I confirm I have read this document" %}</span>
+    </label>
+    {% if row.acknowledgement.acknowledged_at %}
+      <small class="rr-confirmed-date">{% trans "Confirmed" %}: {{ row.acknowledgement.acknowledged_at|date:"M j, Y H:i" }}</small>
+    {% endif %}
+  </div>
+</article>

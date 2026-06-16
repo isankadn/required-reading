@@ -1,0 +1,66 @@
+{% extends "required_reading/base.html" %}
+{% load i18n static %}
+
+{% block required_reading_content %}
+<section class="rr-hero rr-hero-compact">
+  <div>
+    <p class="rr-eyebrow">{% trans "Staff management" %}</p>
+    <h1>{% trans "Manage required reading" %}</h1>
+    <p>{% trans "Upload documents, update page text, and manage the document library." %}</p>
+  </div>
+  <a href="{% url 'required_reading:document_list' %}" class="rr-button rr-button-secondary">{% trans "View user page" %}</a>
+</section>
+
+<section class="rr-panel">
+  <h2>{% trans "Introductory text" %}</h2>
+  <form method="post" action="{% url 'required_reading:update_intro_text' %}" class="rr-stack-form">
+    {% csrf_token %}
+    {{ settings_form.intro_text }}
+    {% if settings_form.intro_text.errors %}<div class="rr-form-error">{{ settings_form.intro_text.errors }}</div>{% endif %}
+    <button type="submit" class="rr-button rr-button-primary">{% trans "Update text" %}</button>
+  </form>
+</section>
+
+{% include "required_reading/partials/upload_panel.html" %}
+
+<section class="rr-panel">
+  <div class="rr-panel-heading">
+    <h2>{% trans "Document library" %}</h2>
+    <span>{{ documents|length }} {% trans "documents" %}</span>
+  </div>
+
+  {% if document_forms %}
+    <div class="rr-manage-list">
+      {% for document, form in document_forms %}
+        <article class="rr-manage-item">
+          <div class="rr-file-icon" aria-hidden="true">PDF</div>
+          <form method="post" enctype="multipart/form-data" action="{% url 'required_reading:edit_document' document.id %}" class="rr-manage-form">
+            {% csrf_token %}
+            <label>{% trans "Title" %} {{ form.title }}</label>
+            <label>{% trans "Display order" %} {{ form.display_order }}</label>
+            <label class="rr-inline-check">{{ form.is_active }} {% trans "Active" %}</label>
+            <label>{% trans "Replace PDF" %} {{ form.pdf_file }}</label>
+            <div class="rr-inline-actions">
+              <a href="{{ document.pdf_file.url }}" target="_blank" rel="noopener noreferrer">{% trans "Open current PDF" %}</a>
+              <button type="submit" class="rr-button rr-button-primary">{% trans "Save" %}</button>
+            </div>
+          </form>
+          <form method="post" action="{% url 'required_reading:delete_document' document.id %}" class="rr-delete-form" data-confirm="{% trans 'Delete this document? Existing acknowledgement records for it will also be removed.' %}">
+            {% csrf_token %}
+            <button type="submit" class="rr-button rr-button-danger">{% trans "Delete" %}</button>
+          </form>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="rr-empty-state">
+      <h3>{% trans "No documents uploaded yet." %}</h3>
+      <p>{% trans "Upload one or more PDF files to begin." %}</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block required_reading_js %}
+<script src="{% static 'required_reading/js/uploader.js' %}"></script>
+{% endblock %}
