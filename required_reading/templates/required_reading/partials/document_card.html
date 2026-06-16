@@ -8,7 +8,7 @@
     </div>
   </div>
   <div class="rr-card-actions">
-    <a class="rr-button rr-button-secondary" href="{{ row.document.pdf_file.url }}" target="_blank" rel="noopener noreferrer">
+    <a class="rr-button rr-button-secondary" href="{% url 'required_reading:open_document' row.document.id %}" target="_blank" rel="noopener noreferrer">
       {% trans "Open PDF" %}
     </a>
     <label class="rr-checkbox-row">

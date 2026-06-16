@@ -132,3 +132,32 @@ class RequiredReadingAcknowledgement(models.Model):
         if not self.acknowledged:
             self.acknowledged_at = None
         super().save(*args, **kwargs)
+
+
+class RequiredReadingDocumentAccess(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="required_reading_document_accesses",
+    )
+    document = models.ForeignKey(
+        RequiredReadingDocument,
+        on_delete=models.CASCADE,
+        related_name="accesses",
+    )
+    first_accessed_at = models.DateTimeField(auto_now_add=True)
+    last_accessed_at = models.DateTimeField(auto_now=True)
+    access_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = (("user", "document"),)
+        ordering = ["document__display_order", "document__title", "user__username"]
+        verbose_name = _("Required reading document access")
+        verbose_name_plural = _("Required reading document accesses")
+
+    def __str__(self):
+        return "{} - {} ({} opens)".format(self.user, self.document, self.access_count)
+
+    def record_open(self):
+        self.access_count = (self.access_count or 0) + 1
+        self.save(update_fields=["access_count", "last_accessed_at"])

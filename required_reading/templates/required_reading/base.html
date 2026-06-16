@@ -19,6 +19,9 @@
         <a class="rr-button {% if required_reading_active_page == 'manage' %}rr-button-primary{% else %}rr-button-secondary{% endif %}" href="{% url 'required_reading:manage_documents' %}">
           {% trans "Document management" %}
         </a>
+        <a class="rr-button {% if required_reading_active_page == 'analytics' %}rr-button-primary{% else %}rr-button-secondary{% endif %}" href="{% url 'required_reading:analytics' %}">
+          {% trans "Analytics" %}
+        </a>
       </nav>
     {% endif %}
     {% if messages %}

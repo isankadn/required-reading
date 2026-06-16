@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     RequiredReadingAcknowledgement,
     RequiredReadingDocument,
+    RequiredReadingDocumentAccess,
     RequiredReadingSettings,
 )
 
@@ -34,4 +35,13 @@ class RequiredReadingAcknowledgementAdmin(admin.ModelAdmin):
     list_filter = ("acknowledged", "document", "acknowledged_at", "updated_at")
     search_fields = ("user__username", "user__email", "document__title")
     readonly_fields = ("updated_at",)
+    autocomplete_fields = ("user", "document")
+
+
+@admin.register(RequiredReadingDocumentAccess)
+class RequiredReadingDocumentAccessAdmin(admin.ModelAdmin):
+    list_display = ("user", "document", "access_count", "first_accessed_at", "last_accessed_at")
+    list_filter = ("document", "first_accessed_at", "last_accessed_at")
+    search_fields = ("user__username", "user__email", "document__title")
+    readonly_fields = ("first_accessed_at", "last_accessed_at", "access_count")
     autocomplete_fields = ("user", "document")

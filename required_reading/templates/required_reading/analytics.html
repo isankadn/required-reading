@@ -1,0 +1,83 @@
+{% extends "required_reading/base.html" %}
+{% load i18n %}
+
+{% block required_reading_content %}
+<section class="rr-hero rr-hero-compact">
+  <div>
+    <p class="rr-eyebrow">{% trans "Staff analytics" %}</p>
+    <h1>{% trans "Required reading analytics" %}</h1>
+    <p>{% trans "Review PDF open activity and reading confirmations by user." %}</p>
+  </div>
+  <div class="rr-progress-card">
+    <strong>{{ document_count }}</strong>
+    <span>{% trans "documents" %}</span>
+    <small>{{ user_count }} {% trans "active users" %}</small>
+  </div>
+</section>
+
+{% if analytics_rows %}
+  <div class="rr-analytics-list">
+    {% for row in analytics_rows %}
+      <section class="rr-panel rr-analytics-document">
+        <div class="rr-panel-heading rr-analytics-heading">
+          <div>
+            <h2>{{ row.document.title }}</h2>
+            <p class="rr-file-meta">{% trans "Uploaded" %}: {{ row.document.created_at|date:"M j, Y" }}</p>
+          </div>
+          <div class="rr-analytics-summary" aria-label="{% trans 'Document summary' %}">
+            <span><strong>{{ row.opened_count }}</strong> {% trans "opened" %}</span>
+            <span><strong>{{ row.confirmed_count }}</strong> {% trans "confirmed" %}</span>
+            <span><strong>{{ row.pending_count }}</strong> {% trans "pending" %}</span>
+          </div>
+        </div>
+
+        <div class="rr-table-wrap">
+          <table class="rr-analytics-table">
+            <thead>
+              <tr>
+                <th>{% trans "User" %}</th>
+                <th>{% trans "Email" %}</th>
+                <th>{% trans "Opened PDF" %}</th>
+                <th>{% trans "Open count" %}</th>
+                <th>{% trans "Last opened" %}</th>
+                <th>{% trans "Confirmed" %}</th>
+                <th>{% trans "Confirmed at" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for user_row in row.user_rows %}
+                <tr>
+                  <td>{{ user_row.user.username }}</td>
+                  <td>{{ user_row.user.email|default:"—" }}</td>
+                  <td>
+                    {% if user_row.has_opened %}
+                      <span class="rr-status-pill rr-status-yes">{% trans "Yes" %}</span>
+                    {% else %}
+                      <span class="rr-status-pill rr-status-no">{% trans "No" %}</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ user_row.access.access_count|default:0 }}</td>
+                  <td>{% if user_row.access.last_accessed_at %}{{ user_row.access.last_accessed_at|date:"M j, Y H:i" }}{% else %}—{% endif %}</td>
+                  <td>
+                    {% if user_row.is_confirmed %}
+                      <span class="rr-status-pill rr-status-yes">{% trans "Yes" %}</span>
+                    {% else %}
+                      <span class="rr-status-pill rr-status-no">{% trans "No" %}</span>
+                    {% endif %}
+                  </td>
+                  <td>{% if user_row.acknowledgement.acknowledged_at %}{{ user_row.acknowledgement.acknowledged_at|date:"M j, Y H:i" }}{% else %}—{% endif %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="rr-empty-state">
+    <h2>{% trans "No documents are available for analytics yet." %}</h2>
+    <p>{% trans "Upload PDFs first, then user open and confirmation activity will appear here." %}</p>
+  </div>
+{% endif %}
+{% endblock %}

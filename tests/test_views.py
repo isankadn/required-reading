@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 
-from required_reading.models import RequiredReadingAcknowledgement, RequiredReadingDocument
+from required_reading.models import RequiredReadingAcknowledgement, RequiredReadingDocument, RequiredReadingDocumentAccess
 
 pytestmark = pytest.mark.django_db
 
@@ -58,6 +58,36 @@ def test_regular_user_does_not_see_document_management_menu(client):
     response = client.get(reverse("required_reading:document_list"))
     assert response.status_code == 200
     assert b"Document management" not in response.content
+
+
+def test_regular_user_cannot_access_analytics(client):
+    user = create_user()
+    client.force_login(user)
+    response = client.get(reverse("required_reading:analytics"))
+    assert response.status_code == 403
+
+
+def test_staff_user_can_access_analytics(client):
+    user = create_user(username="staff", is_staff=True)
+    client.force_login(user)
+    response = client.get(reverse("required_reading:analytics"))
+    assert response.status_code == 200
+    assert b"Required reading analytics" in response.content
+
+
+def test_open_document_tracks_access_and_redirects_to_pdf(client):
+    user = create_user()
+    document = RequiredReadingDocument.objects.create(title="Policy", pdf_file=make_pdf())
+    client.force_login(user)
+    response = client.get(reverse("required_reading:open_document", args=[document.id]))
+    assert response.status_code == 302
+    assert response["Location"].endswith(document.pdf_file.url)
+    access = RequiredReadingDocumentAccess.objects.get(user=user, document=document)
+    assert access.access_count == 1
+
+    client.get(reverse("required_reading:open_document", args=[document.id]))
+    access.refresh_from_db()
+    assert access.access_count == 2
 
 
 def test_user_can_save_own_acknowledgement(client):

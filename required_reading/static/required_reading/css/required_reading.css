@@ -20,7 +20,6 @@
 
 .rr-container {
   margin: 0 auto;
-  max-width: 1120px;
 }
 
 .rr-management-menu {
@@ -180,6 +179,24 @@
 .rr-inline-actions { align-items: center; display: flex; gap: 12px; grid-column: 1 / -1; justify-content: flex-end; }
 .rr-delete-form { align-self: end; }
 .rr-empty-state { background: #fff; border: 1px dashed var(--rr-border); border-radius: 18px; padding: 36px; text-align: center; }
+.rr-analytics-list { display: grid; gap: 22px; }
+.rr-analytics-heading { align-items: flex-start; }
+.rr-analytics-summary { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+.rr-analytics-summary span {
+  background: #fff7f9;
+  border: 1px solid rgba(168, 85, 102, 0.28);
+  border-radius: 999px;
+  color: var(--rr-primary-dark);
+  padding: 8px 12px;
+}
+.rr-table-wrap { overflow-x: auto; }
+.rr-analytics-table { border-collapse: collapse; min-width: 860px; width: 100%; }
+.rr-analytics-table th,
+.rr-analytics-table td { border-bottom: 1px solid var(--rr-border); padding: 12px 10px; text-align: left; vertical-align: top; }
+.rr-analytics-table th { color: var(--rr-muted); font-size: 0.82rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.rr-status-pill { border-radius: 999px; display: inline-flex; font-size: 0.85rem; font-weight: 700; padding: 5px 10px; }
+.rr-status-yes { background: #ecfdf3; color: #05603a; }
+.rr-status-no { background: #f2f4f7; color: #475467; }
 .rr-messages { display: grid; gap: 10px; margin-bottom: 18px; }
 .rr-message { border-radius: 12px; padding: 12px 16px; }
 .rr-message-success { background: #ecfdf3; color: #05603a; }

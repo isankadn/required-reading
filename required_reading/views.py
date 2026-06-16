@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
@@ -16,6 +17,7 @@ from .forms import (
 from .models import (
     RequiredReadingAcknowledgement,
     RequiredReadingDocument,
+    RequiredReadingDocumentAccess,
     RequiredReadingSettings,
 )
 from .permissions import is_required_reading_manager, staff_required
@@ -80,6 +82,73 @@ def save_acknowledgements(request):
 
     messages.success(request, _("Your required reading confirmations have been saved."))
     return redirect("required_reading:document_list")
+
+
+@login_required
+def open_document(request, pk):
+    document = get_object_or_404(RequiredReadingDocument, pk=pk, is_active=True)
+    access, created = RequiredReadingDocumentAccess.objects.get_or_create(
+        user=request.user,
+        document=document,
+    )
+    access.record_open()
+    return redirect(document.pdf_file.url)
+
+
+@staff_required
+def analytics(request):
+    User = get_user_model()
+    users = list(User.objects.filter(is_active=True).order_by("username", "email"))
+    documents = list(RequiredReadingDocument.objects.all().prefetch_related("acknowledgements", "accesses"))
+    analytics_rows = []
+
+    for document in documents:
+        acknowledgements = {item.user_id: item for item in document.acknowledgements.all()}
+        accesses = {item.user_id: item for item in document.accesses.all()}
+        user_rows = []
+        confirmed_count = 0
+        opened_count = 0
+
+        for user in users:
+            acknowledgement = acknowledgements.get(user.id)
+            access = accesses.get(user.id)
+            is_confirmed = bool(acknowledgement and acknowledgement.acknowledged)
+            has_opened = bool(access and access.access_count)
+            if is_confirmed:
+                confirmed_count += 1
+            if has_opened:
+                opened_count += 1
+            user_rows.append(
+                {
+                    "user": user,
+                    "acknowledgement": acknowledgement,
+                    "access": access,
+                    "is_confirmed": is_confirmed,
+                    "has_opened": has_opened,
+                }
+            )
+
+        analytics_rows.append(
+            {
+                "document": document,
+                "user_rows": user_rows,
+                "confirmed_count": confirmed_count,
+                "opened_count": opened_count,
+                "pending_count": max(len(users) - confirmed_count, 0),
+            }
+        )
+
+    return render(
+        request,
+        "required_reading/analytics.html",
+        {
+            "analytics_rows": analytics_rows,
+            "user_count": len(users),
+            "document_count": len(documents),
+            "can_manage_required_reading": True,
+            "required_reading_active_page": "analytics",
+        },
+    )
 
 
 @staff_required
