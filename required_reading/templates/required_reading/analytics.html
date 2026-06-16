@@ -6,7 +6,7 @@
   <div>
     <p class="rr-eyebrow">{% trans "Staff analytics" %}</p>
     <h1>{% trans "Required reading analytics" %}</h1>
-    <p>{% trans "Review PDF open activity and reading confirmations by user." %}</p>
+    <p>{% trans "Select a PDF to view individual learner open and confirmation activity." %}</p>
   </div>
   <div class="rr-progress-card">
     <strong>{{ document_count }}</strong>
@@ -16,31 +16,25 @@
 </section>
 
 <section class="rr-panel rr-filter-panel">
-  <form method="get" class="rr-search-form rr-analytics-search-form">
-    <div>
-      <label for="rr-analytics-document-search">{% trans "Search PDFs" %}</label>
+  <form method="get" class="rr-search-form">
+    <label for="rr-analytics-document-search">{% trans "Search PDFs" %}</label>
+    <div class="rr-search-row">
       <input id="rr-analytics-document-search" class="rr-input" type="search" name="document_q" value="{{ document_search }}" placeholder="{% trans 'PDF title' %}">
-    </div>
-    <div>
-      <label for="rr-analytics-user-search">{% trans "Search users" %}</label>
-      <input id="rr-analytics-user-search" class="rr-input" type="search" name="user_q" value="{{ user_search }}" placeholder="{% trans 'Username or email' %}">
-    </div>
-    <div class="rr-search-actions">
       <button class="rr-button rr-button-primary" type="submit">{% trans "Search" %}</button>
-      {% if document_search or user_search %}
+      {% if document_search %}
         <a class="rr-button rr-button-secondary" href="{% url 'required_reading:analytics' %}">{% trans "Clear" %}</a>
       {% endif %}
     </div>
   </form>
   <p class="rr-filter-summary">
-    {% blocktrans with filtered=filtered_user_count total=user_count %}Showing {{ filtered }} of {{ total }} active users per document.{% endblocktrans %}
+    {% blocktrans with filtered=filtered_document_count total=document_count %}Showing {{ filtered }} of {{ total }} PDF documents.{% endblocktrans %}
   </p>
 </section>
 
 {% if analytics_rows %}
-  <div class="rr-analytics-list">
+  <div class="rr-analytics-list rr-analytics-summary-list">
     {% for row in analytics_rows %}
-      <section class="rr-panel rr-analytics-document">
+      <article class="rr-panel rr-analytics-document rr-analytics-summary-card">
         <div class="rr-panel-heading rr-analytics-heading">
           <div>
             <h2>{{ row.document.title }}</h2>
@@ -52,65 +46,29 @@
             <span><strong>{{ row.pending_count }}</strong> {% trans "pending" %}</span>
           </div>
         </div>
-
-        <div class="rr-table-wrap">
-          <table class="rr-analytics-table">
-            <thead>
-              <tr>
-                <th>{% trans "User" %}</th>
-                <th>{% trans "Email" %}</th>
-                <th>{% trans "Opened PDF" %}</th>
-                <th>{% trans "Open count" %}</th>
-                <th>{% trans "Last opened" %}</th>
-                <th>{% trans "Confirmed" %}</th>
-                <th>{% trans "Confirmed at" %}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for user_row in row.user_rows %}
-                <tr>
-                  <td>{{ user_row.user.username }}</td>
-                  <td>{{ user_row.user.email|default:"—" }}</td>
-                  <td>
-                    {% if user_row.has_opened %}
-                      <span class="rr-status-pill rr-status-yes">{% trans "Yes" %}</span>
-                    {% else %}
-                      <span class="rr-status-pill rr-status-no">{% trans "No" %}</span>
-                    {% endif %}
-                  </td>
-                  <td>{{ user_row.access.access_count|default:0 }}</td>
-                  <td>{% if user_row.access.last_accessed_at %}{{ user_row.access.last_accessed_at|date:"M j, Y H:i" }}{% else %}—{% endif %}</td>
-                  <td>
-                    {% if user_row.is_confirmed %}
-                      <span class="rr-status-pill rr-status-yes">{% trans "Yes" %}</span>
-                    {% else %}
-                      <span class="rr-status-pill rr-status-no">{% trans "No" %}</span>
-                    {% endif %}
-                  </td>
-                  <td>{% if user_row.acknowledgement.acknowledged_at %}{{ user_row.acknowledgement.acknowledged_at|date:"M j, Y H:i" }}{% else %}—{% endif %}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <div class="rr-analytics-card-actions">
+          <a class="rr-button rr-button-primary" href="{% url 'required_reading:analytics_document' row.document.id %}">
+            {% trans "View learner analytics" %}
+          </a>
         </div>
-      </section>
+      </article>
     {% endfor %}
   </div>
-  {% if user_page.has_other_pages %}
-    <nav class="rr-pagination" aria-label="{% trans 'Analytics user pages' %}">
-      {% if user_page.has_previous %}
-        <a class="rr-button rr-button-secondary" href="?document_q={{ document_search|urlencode }}&user_q={{ user_search|urlencode }}&user_page={{ user_page.previous_page_number }}">{% trans "Previous users" %}</a>
+  {% if document_page.has_other_pages %}
+    <nav class="rr-pagination" aria-label="{% trans 'Analytics PDF pages' %}">
+      {% if document_page.has_previous %}
+        <a class="rr-button rr-button-secondary" href="?document_q={{ document_search|urlencode }}&page={{ document_page.previous_page_number }}">{% trans "Previous" %}</a>
       {% endif %}
-      <span>{% blocktrans with current=user_page.number total=user_page.paginator.num_pages %}User page {{ current }} of {{ total }}{% endblocktrans %}</span>
-      {% if user_page.has_next %}
-        <a class="rr-button rr-button-secondary" href="?document_q={{ document_search|urlencode }}&user_q={{ user_search|urlencode }}&user_page={{ user_page.next_page_number }}">{% trans "Next users" %}</a>
+      <span>{% blocktrans with current=document_page.number total=document_page.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}</span>
+      {% if document_page.has_next %}
+        <a class="rr-button rr-button-secondary" href="?document_q={{ document_search|urlencode }}&page={{ document_page.next_page_number }}">{% trans "Next" %}</a>
       {% endif %}
     </nav>
   {% endif %}
 {% else %}
   <div class="rr-empty-state">
     <h2>{% trans "No documents are available for analytics yet." %}</h2>
-    <p>{% trans "Upload PDFs first, then user open and confirmation activity will appear here." %}</p>
+    <p>{% trans "Upload PDFs first, then activity summaries will appear here." %}</p>
   </div>
 {% endif %}
 {% endblock %}

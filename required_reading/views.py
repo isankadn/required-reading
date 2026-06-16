@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
@@ -145,52 +145,29 @@ def open_document(request, pk):
 def analytics(request):
     User = get_user_model()
     document_search = request.GET.get("document_q", "").strip()
-    user_search = request.GET.get("user_q", "").strip()
+    total_user_count = User.objects.filter(is_active=True).count()
 
-    users_queryset = User.objects.filter(is_active=True).order_by("username", "email")
-    if user_search:
-        users_queryset = users_queryset.filter(Q(username__icontains=user_search) | Q(email__icontains=user_search))
-    user_page = paginate_queryset(request, users_queryset, ANALYTICS_USERS_PER_PAGE, page_param="user_page")
-    users = list(user_page.object_list)
-
-    documents_queryset = RequiredReadingDocument.objects.all().order_by("display_order", "title", "id")
+    documents_queryset = RequiredReadingDocument.objects.all().annotate(
+        opened_count=Count("accesses__user", filter=Q(accesses__access_count__gt=0), distinct=True),
+        confirmed_count=Count(
+            "acknowledgements__user",
+            filter=Q(acknowledgements__acknowledged=True),
+            distinct=True,
+        ),
+    ).order_by("display_order", "title", "id")
     if document_search:
         documents_queryset = documents_queryset.filter(title__icontains=document_search)
-    documents = list(documents_queryset.prefetch_related("acknowledgements", "accesses"))
-    total_user_count = User.objects.filter(is_active=True).count()
-    analytics_rows = []
 
-    for document in documents:
-        acknowledgements = {item.user_id: item for item in document.acknowledgements.all()}
-        accesses = {item.user_id: item for item in document.accesses.all()}
-        user_rows = []
-        confirmed_count = sum(1 for item in acknowledgements.values() if item.acknowledged)
-        opened_count = sum(1 for item in accesses.values() if item.access_count)
-
-        for user in users:
-            acknowledgement = acknowledgements.get(user.id)
-            access = accesses.get(user.id)
-            is_confirmed = bool(acknowledgement and acknowledgement.acknowledged)
-            has_opened = bool(access and access.access_count)
-            user_rows.append(
-                {
-                    "user": user,
-                    "acknowledgement": acknowledgement,
-                    "access": access,
-                    "is_confirmed": is_confirmed,
-                    "has_opened": has_opened,
-                }
-            )
-
-        analytics_rows.append(
-            {
-                "document": document,
-                "user_rows": user_rows,
-                "confirmed_count": confirmed_count,
-                "opened_count": opened_count,
-                "pending_count": max(total_user_count - confirmed_count, 0),
-            }
-        )
+    document_page = paginate_queryset(request, documents_queryset, DOCUMENTS_PER_PAGE)
+    analytics_rows = [
+        {
+            "document": document,
+            "opened_count": document.opened_count,
+            "confirmed_count": document.confirmed_count,
+            "pending_count": max(total_user_count - document.confirmed_count, 0),
+        }
+        for document in document_page.object_list
+    ]
 
     return render(
         request,
@@ -198,11 +175,65 @@ def analytics(request):
         {
             "analytics_rows": analytics_rows,
             "user_count": total_user_count,
+            "document_count": RequiredReadingDocument.objects.count(),
+            "filtered_document_count": document_page.paginator.count,
+            "document_page": document_page,
+            "document_search": document_search,
+            "can_manage_required_reading": True,
+            "required_reading_active_page": "analytics",
+        },
+    )
+
+
+@staff_required
+def analytics_document(request, pk):
+    User = get_user_model()
+    document = get_object_or_404(RequiredReadingDocument, pk=pk)
+    user_search = request.GET.get("user_q", "").strip()
+    users_queryset = User.objects.filter(is_active=True).order_by("username", "email")
+    if user_search:
+        users_queryset = users_queryset.filter(Q(username__icontains=user_search) | Q(email__icontains=user_search))
+
+    user_page = paginate_queryset(request, users_queryset, ANALYTICS_USERS_PER_PAGE, page_param="user_page")
+    users = list(user_page.object_list)
+    acknowledgements = {
+        item.user_id: item
+        for item in RequiredReadingAcknowledgement.objects.filter(document=document, user__in=users)
+    }
+    accesses = {
+        item.user_id: item
+        for item in RequiredReadingDocumentAccess.objects.filter(document=document, user__in=users)
+    }
+    total_user_count = User.objects.filter(is_active=True).count()
+    confirmed_count = RequiredReadingAcknowledgement.objects.filter(document=document, acknowledged=True).count()
+    opened_count = RequiredReadingDocumentAccess.objects.filter(document=document, access_count__gt=0).count()
+    user_rows = []
+    for user in users:
+        acknowledgement = acknowledgements.get(user.id)
+        access = accesses.get(user.id)
+        user_rows.append(
+            {
+                "user": user,
+                "acknowledgement": acknowledgement,
+                "access": access,
+                "is_confirmed": bool(acknowledgement and acknowledgement.acknowledged),
+                "has_opened": bool(access and access.access_count),
+            }
+        )
+
+    return render(
+        request,
+        "required_reading/analytics_detail.html",
+        {
+            "document": document,
+            "user_rows": user_rows,
+            "user_count": total_user_count,
             "filtered_user_count": user_page.paginator.count,
             "user_page": user_page,
-            "document_search": document_search,
             "user_search": user_search,
-            "document_count": len(documents),
+            "opened_count": opened_count,
+            "confirmed_count": confirmed_count,
+            "pending_count": max(total_user_count - confirmed_count, 0),
             "can_manage_required_reading": True,
             "required_reading_active_page": "analytics",
         },

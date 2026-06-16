@@ -116,28 +116,52 @@ def test_staff_user_can_access_analytics(client):
     assert b"Required reading analytics" in response.content
 
 
-def test_analytics_search_filters_users_and_documents(client):
+def test_analytics_search_filters_documents_only(client):
     staff = create_user(username="staff", is_staff=True)
     create_user(username="alpha_user", email="alpha@example.com")
-    create_user(username="beta_user", email="beta@example.com")
     RequiredReadingDocument.objects.create(title="Alpha PDF", pdf_file=make_pdf("alpha.pdf"))
     RequiredReadingDocument.objects.create(title="Beta PDF", pdf_file=make_pdf("beta.pdf"))
     client.force_login(staff)
-    response = client.get(reverse("required_reading:analytics"), {"document_q": "Alpha", "user_q": "alpha"})
+    response = client.get(reverse("required_reading:analytics"), {"document_q": "Alpha"})
     assert response.status_code == 200
     assert b"Alpha PDF" in response.content
     assert b"Beta PDF" not in response.content
+    assert b"alpha_user" not in response.content
+
+
+def test_analytics_paginates_documents(client):
+    staff = create_user(username="staff", is_staff=True)
+    for index in range(55):
+        RequiredReadingDocument.objects.create(title="PDF {:02d}".format(index), pdf_file=make_pdf("pdf-{}.pdf".format(index)))
+    client.force_login(staff)
+    response = client.get(reverse("required_reading:analytics"))
+    assert response.status_code == 200
+    assert b"PDF 00" in response.content
+    assert b"PDF 49" in response.content
+    assert b"PDF 50" not in response.content
+    assert b"Page 1 of 2" in response.content
+
+
+def test_analytics_document_detail_search_filters_users(client):
+    staff = create_user(username="staff", is_staff=True)
+    create_user(username="alpha_user", email="alpha@example.com")
+    create_user(username="beta_user", email="beta@example.com")
+    document = RequiredReadingDocument.objects.create(title="Alpha PDF", pdf_file=make_pdf("alpha.pdf"))
+    client.force_login(staff)
+    response = client.get(reverse("required_reading:analytics_document", args=[document.id]), {"user_q": "alpha"})
+    assert response.status_code == 200
+    assert b"Alpha PDF" in response.content
     assert b"alpha_user" in response.content
     assert b"beta_user" not in response.content
 
 
-def test_analytics_paginates_users(client):
+def test_analytics_document_detail_paginates_users(client):
     staff = create_user(username="staff", is_staff=True)
-    RequiredReadingDocument.objects.create(title="Policy", pdf_file=make_pdf("policy.pdf"))
+    document = RequiredReadingDocument.objects.create(title="Policy", pdf_file=make_pdf("policy.pdf"))
     for index in range(55):
         create_user(username="learner_{:02d}".format(index), email="learner_{:02d}@example.com".format(index))
     client.force_login(staff)
-    response = client.get(reverse("required_reading:analytics"))
+    response = client.get(reverse("required_reading:analytics_document", args=[document.id]))
     assert response.status_code == 200
     assert b"learner_00" in response.content
     assert b"learner_48" in response.content

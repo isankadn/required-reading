@@ -223,6 +223,8 @@
   color: var(--rr-primary-dark);
   padding: 8px 12px;
 }
+.rr-detail-summary { justify-content: flex-start; }
+.rr-analytics-card-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
 .rr-table-wrap { overflow-x: auto; }
 .rr-analytics-table { border-collapse: collapse; min-width: 860px; width: 100%; }
 .rr-analytics-table th,
