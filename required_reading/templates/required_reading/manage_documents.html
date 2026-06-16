@@ -34,21 +34,31 @@
       {% for document, form in document_forms %}
         <article class="rr-manage-item">
           <div class="rr-file-icon" aria-hidden="true">PDF</div>
-          <form method="post" enctype="multipart/form-data" action="{% url 'required_reading:edit_document' document.id %}" class="rr-manage-form">
-            {% csrf_token %}
-            <label>{% trans "Title" %} {{ form.title }}</label>
-            <label>{% trans "Display order" %} {{ form.display_order }}</label>
-            <label class="rr-inline-check">{{ form.is_active }} {% trans "Active" %}</label>
-            <label>{% trans "Replace PDF" %} {{ form.pdf_file }}</label>
-            <div class="rr-inline-actions">
+          <div class="rr-manage-body">
+            <form id="rr-edit-document-{{ document.id }}" method="post" enctype="multipart/form-data" action="{% url 'required_reading:edit_document' document.id %}" class="rr-manage-form">
+              {% csrf_token %}
+              <div class="rr-manage-row rr-manage-row-fields">
+                <label class="rr-field"><span>{% trans "Title" %}</span> {{ form.title }}</label>
+                <label class="rr-field"><span>{% trans "Display order" %}</span> {{ form.display_order }}</label>
+                <label class="rr-inline-check rr-active-check">{{ form.is_active }} <span>{% trans "Active" %}</span></label>
+              </div>
+              <div class="rr-manage-row rr-manage-row-file">
+                <label class="rr-field">
+                  <span>{% trans "Replace PDF" %}</span>
+                  <small class="rr-current-file">{% trans "Currently" %}: <a href="{{ document.pdf_file.url }}" target="_blank" rel="noopener noreferrer">{{ document.filename }}</a></small>
+                  {{ form.pdf_file }}
+                </label>
+              </div>
+            </form>
+            <div class="rr-manage-actions">
               <a href="{{ document.pdf_file.url }}" target="_blank" rel="noopener noreferrer">{% trans "Open current PDF" %}</a>
-              <button type="submit" class="rr-button rr-button-primary">{% trans "Save" %}</button>
+              <button type="submit" form="rr-edit-document-{{ document.id }}" class="rr-button rr-button-primary">{% trans "Save" %}</button>
+              <form method="post" action="{% url 'required_reading:delete_document' document.id %}" class="rr-delete-form" data-confirm="{% trans 'Delete this document? Existing acknowledgement records for it will also be removed.' %}">
+                {% csrf_token %}
+                <button type="submit" class="rr-button rr-button-danger">{% trans "Delete" %}</button>
+              </form>
             </div>
-          </form>
-          <form method="post" action="{% url 'required_reading:delete_document' document.id %}" class="rr-delete-form" data-confirm="{% trans 'Delete this document? Existing acknowledgement records for it will also be removed.' %}">
-            {% csrf_token %}
-            <button type="submit" class="rr-button rr-button-danger">{% trans "Delete" %}</button>
-          </form>
+          </div>
         </article>
       {% endfor %}
     </div>
