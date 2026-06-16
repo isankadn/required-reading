@@ -16,6 +16,22 @@
   </div>
 </section>
 
+<section class="rr-panel rr-filter-panel">
+  <form method="get" class="rr-search-form">
+    <label for="rr-document-search">{% trans "Search PDF documents" %}</label>
+    <div class="rr-search-row">
+      <input id="rr-document-search" class="rr-input" type="search" name="q" value="{{ search_query }}" placeholder="{% trans 'Search by PDF title' %}">
+      <button class="rr-button rr-button-primary" type="submit">{% trans "Search" %}</button>
+      {% if search_query %}
+        <a class="rr-button rr-button-secondary" href="{% url 'required_reading:document_list' %}">{% trans "Clear" %}</a>
+      {% endif %}
+    </div>
+  </form>
+  <p class="rr-filter-summary">
+    {% blocktrans with filtered=filtered_document_count total=document_count %}Showing {{ filtered }} of {{ total }} PDF documents.{% endblocktrans %}
+  </p>
+</section>
+
 {% if document_rows %}
 <form method="post" action="{% url 'required_reading:save_acknowledgements' %}" class="rr-document-form">
   {% csrf_token %}
@@ -28,6 +44,17 @@
     <button type="submit" class="rr-button rr-button-primary">{% trans "Save confirmations" %}</button>
   </div>
 </form>
+{% if document_page.has_other_pages %}
+  <nav class="rr-pagination" aria-label="{% trans 'PDF document pages' %}">
+    {% if document_page.has_previous %}
+      <a class="rr-button rr-button-secondary" href="?q={{ search_query|urlencode }}&page={{ document_page.previous_page_number }}">{% trans "Previous" %}</a>
+    {% endif %}
+    <span>{% blocktrans with current=document_page.number total=document_page.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}</span>
+    {% if document_page.has_next %}
+      <a class="rr-button rr-button-secondary" href="?q={{ search_query|urlencode }}&page={{ document_page.next_page_number }}">{% trans "Next" %}</a>
+    {% endif %}
+  </nav>
+{% endif %}
 {% else %}
   <div class="rr-empty-state">
     <h2>{% trans "No required reading documents are available yet." %}</h2>

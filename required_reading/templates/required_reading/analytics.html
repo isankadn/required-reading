@@ -15,6 +15,28 @@
   </div>
 </section>
 
+<section class="rr-panel rr-filter-panel">
+  <form method="get" class="rr-search-form rr-analytics-search-form">
+    <div>
+      <label for="rr-analytics-document-search">{% trans "Search PDFs" %}</label>
+      <input id="rr-analytics-document-search" class="rr-input" type="search" name="document_q" value="{{ document_search }}" placeholder="{% trans 'PDF title' %}">
+    </div>
+    <div>
+      <label for="rr-analytics-user-search">{% trans "Search users" %}</label>
+      <input id="rr-analytics-user-search" class="rr-input" type="search" name="user_q" value="{{ user_search }}" placeholder="{% trans 'Username or email' %}">
+    </div>
+    <div class="rr-search-actions">
+      <button class="rr-button rr-button-primary" type="submit">{% trans "Search" %}</button>
+      {% if document_search or user_search %}
+        <a class="rr-button rr-button-secondary" href="{% url 'required_reading:analytics' %}">{% trans "Clear" %}</a>
+      {% endif %}
+    </div>
+  </form>
+  <p class="rr-filter-summary">
+    {% blocktrans with filtered=filtered_user_count total=user_count %}Showing {{ filtered }} of {{ total }} active users per document.{% endblocktrans %}
+  </p>
+</section>
+
 {% if analytics_rows %}
   <div class="rr-analytics-list">
     {% for row in analytics_rows %}
@@ -74,6 +96,17 @@
       </section>
     {% endfor %}
   </div>
+  {% if user_page.has_other_pages %}
+    <nav class="rr-pagination" aria-label="{% trans 'Analytics user pages' %}">
+      {% if user_page.has_previous %}
+        <a class="rr-button rr-button-secondary" href="?document_q={{ document_search|urlencode }}&user_q={{ user_search|urlencode }}&user_page={{ user_page.previous_page_number }}">{% trans "Previous users" %}</a>
+      {% endif %}
+      <span>{% blocktrans with current=user_page.number total=user_page.paginator.num_pages %}User page {{ current }} of {{ total }}{% endblocktrans %}</span>
+      {% if user_page.has_next %}
+        <a class="rr-button rr-button-secondary" href="?document_q={{ document_search|urlencode }}&user_q={{ user_search|urlencode }}&user_page={{ user_page.next_page_number }}">{% trans "Next users" %}</a>
+      {% endif %}
+    </nav>
+  {% endif %}
 {% else %}
   <div class="rr-empty-state">
     <h2>{% trans "No documents are available for analytics yet." %}</h2>

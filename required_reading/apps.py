@@ -24,3 +24,6 @@ class RequiredReadingConfig(AppConfig):
                 }
             }
         }
+
+    def ready(self):
+        from . import signals  # noqa: F401 pylint: disable=unused-import
