@@ -92,4 +92,13 @@
     {% endif %}
   </nav>
 {% endif %}
+
+<div class="rr-export-actions">
+  <a
+    class="rr-button rr-button-secondary"
+    href="{% url 'required_reading:analytics_document_export_csv' document.id %}{% if user_search %}?user_q={{ user_search|urlencode }}{% endif %}"
+  >
+    {% trans "Download CSV" %}
+  </a>
+</div>
 {% endblock %}

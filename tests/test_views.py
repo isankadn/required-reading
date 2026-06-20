@@ -1,7 +1,12 @@
+import csv
+import io
+import re
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
+from django.utils import timezone
 
 from required_reading.cache import clear_required_reading_cache, get_cached
 from required_reading.models import RequiredReadingAcknowledgement, RequiredReadingDocument, RequiredReadingDocumentAccess
@@ -168,6 +173,112 @@ def test_analytics_document_detail_paginates_users(client):
     assert b"learner_49" in response.content
     assert b"learner_50" not in response.content
     assert b"User page 1 of 2" in response.content
+
+
+def test_regular_user_cannot_export_analytics_csv(client):
+    user = create_user()
+    client.force_login(user)
+    response = client.get(reverse("required_reading:analytics_export_csv"))
+    assert response.status_code == 403
+
+
+def test_regular_user_cannot_export_analytics_detail_csv(client):
+    user = create_user()
+    document = RequiredReadingDocument.objects.create(title="Policy", pdf_file=make_pdf("policy.pdf"))
+    client.force_login(user)
+    response = client.get(reverse("required_reading:analytics_document_export_csv", args=[document.id]))
+    assert response.status_code == 403
+
+
+def test_analytics_export_csv_returns_all_filtered_documents(client):
+    staff = create_user(username="staff", is_staff=True)
+    create_user(username="learner", email="learner@example.com")
+    for index in range(55):
+        RequiredReadingDocument.objects.create(
+            title="PDF {:02d}".format(index),
+            pdf_file=make_pdf("pdf-{}.pdf".format(index)),
+        )
+    RequiredReadingDocument.objects.create(title="Alpha PDF", pdf_file=make_pdf("alpha.pdf"))
+    client.force_login(staff)
+    response = client.get(reverse("required_reading:analytics_export_csv"), {"document_q": "Alpha"})
+    assert response.status_code == 200
+    assert response["Content-Type"] == "text/csv"
+    assert re.match(
+        r'^attachment; filename="required-reading-analytics-\d{8}-\d{6}\.csv"$',
+        response["Content-Disposition"],
+    )
+
+    rows = list(csv.reader(io.StringIO(response.content.decode("utf-8"))))
+    assert rows[0] == ["PDF name", "Opened", "Confirmed", "Pending"]
+    assert len(rows) == 2
+    assert rows[1][0] == "Alpha PDF"
+    assert rows[1][1:] == ["0", "0", "2"]
+
+
+def test_analytics_document_export_csv_returns_all_filtered_users(client):
+    staff = create_user(username="staff", is_staff=True)
+    document = RequiredReadingDocument.objects.create(title="Safety Policy", pdf_file=make_pdf("policy.pdf"))
+    alpha = create_user(username="alpha_user", email="alpha@example.com")
+    create_user(username="beta_user", email="beta@example.com")
+    for index in range(55):
+        create_user(username="learner_{:02d}".format(index), email="learner_{:02d}@example.com".format(index))
+
+    access = RequiredReadingDocumentAccess.objects.create(user=alpha, document=document, access_count=2)
+    access.last_accessed_at = timezone.now()
+    access.save(update_fields=["last_accessed_at"])
+    RequiredReadingAcknowledgement.objects.create(
+        user=alpha,
+        document=document,
+        acknowledged=True,
+        acknowledged_at=timezone.now(),
+    )
+
+    client.force_login(staff)
+    response = client.get(
+        reverse("required_reading:analytics_document_export_csv", args=[document.id]),
+        {"user_q": "alpha"},
+    )
+    assert response.status_code == 200
+    assert response["Content-Type"] == "text/csv"
+    assert re.match(
+        r'^attachment; filename="required-reading-analytics-safety-policy-\d{8}-\d{6}\.csv"$',
+        response["Content-Disposition"],
+    )
+
+    rows = list(csv.reader(io.StringIO(response.content.decode("utf-8"))))
+    assert rows[0] == [
+        "User",
+        "Email",
+        "Opened PDF",
+        "Open count",
+        "Last opened",
+        "Confirmed",
+        "Confirmed at",
+    ]
+    assert len(rows) == 2
+    assert rows[1][0] == "alpha_user"
+    assert rows[1][1] == "alpha@example.com"
+    assert rows[1][2] == "Yes"
+    assert rows[1][3] == "2"
+    assert rows[1][5] == "Yes"
+    assert rows[1][4]
+    assert rows[1][6]
+
+
+def test_analytics_pages_include_download_csv_links(client):
+    staff = create_user(username="staff", is_staff=True)
+    document = RequiredReadingDocument.objects.create(title="Policy", pdf_file=make_pdf("policy.pdf"))
+    client.force_login(staff)
+
+    analytics_response = client.get(reverse("required_reading:analytics"))
+    assert analytics_response.status_code == 200
+    assert b"Download CSV" in analytics_response.content
+    assert reverse("required_reading:analytics_export_csv").encode() in analytics_response.content
+
+    detail_response = client.get(reverse("required_reading:analytics_document", args=[document.id]))
+    assert detail_response.status_code == 200
+    assert b"Download CSV" in detail_response.content
+    assert reverse("required_reading:analytics_document_export_csv", args=[document.id]).encode() in detail_response.content
 
 
 def test_open_document_tracks_access_and_redirects_to_pdf(client):

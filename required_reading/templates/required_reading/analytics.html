@@ -29,6 +29,14 @@
   <p class="rr-filter-summary">
     {% blocktrans with filtered=filtered_document_count total=document_count %}Showing {{ filtered }} of {{ total }} PDF documents.{% endblocktrans %}
   </p>
+  <div class="rr-export-actions">
+    <a
+      class="rr-button rr-button-secondary"
+      href="{% url 'required_reading:analytics_export_csv' %}{% if document_search %}?document_q={{ document_search|urlencode }}{% endif %}"
+    >
+      {% trans "Download CSV" %}
+    </a>
+  </div>
 </section>
 
 {% if analytics_rows %}
