@@ -32,6 +32,7 @@ from .permissions import is_required_reading_manager, staff_required
 
 DOCUMENTS_PER_PAGE = 50
 ANALYTICS_USERS_PER_PAGE = 50
+READ_CONFIRMATION_DELAY_SECONDS = 30
 
 
 def get_settings_cached():
@@ -124,6 +125,56 @@ def csv_response(filename_prefix, header, rows):
     return response
 
 
+def get_document_access(user, document):
+    return RequiredReadingDocumentAccess.objects.filter(user=user, document=document).first()
+
+
+def get_confirmation_opened_at(access):
+    if not access:
+        return None
+    return access.last_accessed_at or access.first_accessed_at
+
+
+def get_confirmation_remaining_seconds(access, now=None):
+    opened_at = get_confirmation_opened_at(access)
+    if not opened_at:
+        return READ_CONFIRMATION_DELAY_SECONDS
+    now = now or timezone.now()
+    elapsed = (now - opened_at).total_seconds()
+    return max(0, int(READ_CONFIRMATION_DELAY_SECONDS - elapsed))
+
+
+def can_confirm_reading(access, is_acknowledged=False):
+    if is_acknowledged:
+        return True
+    if not access or not access.access_count:
+        return False
+    return get_confirmation_remaining_seconds(access) == 0
+
+
+def validate_acknowledgement_request(user, document, want_acknowledged):
+    acknowledgement = RequiredReadingAcknowledgement.objects.filter(user=user, document=document).first()
+    is_acknowledged = bool(acknowledgement and acknowledgement.acknowledged)
+
+    if not want_acknowledged:
+        return True, None
+
+    if is_acknowledged:
+        return True, None
+
+    access = get_document_access(user, document)
+    if not access or not access.access_count:
+        return False, _("You must open the PDF before confirming that you have read it.")
+
+    remaining = get_confirmation_remaining_seconds(access)
+    if remaining > 0:
+        return False, _(
+            "Please continue reading the PDF for at least %(seconds)s seconds before confirming."
+        ) % {"seconds": READ_CONFIRMATION_DELAY_SECONDS}
+
+    return True, None
+
+
 @login_required
 def document_list(request):
     settings_obj = get_settings_cached()
@@ -145,19 +196,34 @@ def document_list(request):
             document__in=documents,
         )
     }
+    accesses = {
+        access.document_id: access
+        for access in RequiredReadingDocumentAccess.objects.filter(
+            user=request.user,
+            document__in=documents,
+        )
+    }
     acknowledged_count = RequiredReadingAcknowledgement.objects.filter(
         user=request.user,
         document_id__in=get_active_document_ids_cached(),
         acknowledged=True,
     ).count()
-    document_rows = [
-        {
-            "document": document,
-            "acknowledgement": acknowledgements.get(document.id),
-            "is_acknowledged": bool(acknowledgements.get(document.id) and acknowledgements[document.id].acknowledged),
-        }
-        for document in documents
-    ]
+    document_rows = []
+    for document in documents:
+        acknowledgement = acknowledgements.get(document.id)
+        access = accesses.get(document.id)
+        is_acknowledged = bool(acknowledgement and acknowledgement.acknowledged)
+        has_opened = bool(access and access.access_count)
+        document_rows.append(
+            {
+                "document": document,
+                "acknowledgement": acknowledgement,
+                "access": access,
+                "is_acknowledged": is_acknowledged,
+                "has_opened": has_opened,
+                "can_confirm": can_confirm_reading(access, is_acknowledged),
+            }
+        )
     return render(
         request,
         "required_reading/document_list.html",
@@ -187,16 +253,74 @@ def save_acknowledgements(request):
         except (TypeError, ValueError):
             continue
 
+    errors = []
+    saved_count = 0
     with transaction.atomic():
         for document in documents:
-            acknowledgement, created = RequiredReadingAcknowledgement.objects.get_or_create(
+            want_acknowledged = document.id in selected_ids
+            acknowledgement = RequiredReadingAcknowledgement.objects.filter(
+                user=request.user,
+                document=document,
+            ).first()
+            currently_acknowledged = bool(acknowledgement and acknowledgement.acknowledged)
+
+            if want_acknowledged == currently_acknowledged:
+                continue
+
+            is_valid, error_message = validate_acknowledgement_request(
+                request.user,
+                document,
+                want_acknowledged,
+            )
+            if not is_valid:
+                errors.append("{}: {}".format(document.title, error_message))
+                continue
+
+            acknowledgement, _created = RequiredReadingAcknowledgement.objects.get_or_create(
                 user=request.user,
                 document=document,
             )
-            acknowledgement.acknowledged = document.id in selected_ids
+            acknowledgement.acknowledged = want_acknowledged
             acknowledgement.save()
+            saved_count += 1
 
-    messages.success(request, _("Your required reading confirmations have been saved."))
+    if errors:
+        for error in errors:
+            messages.error(request, error)
+    if saved_count:
+        messages.success(request, _("Your required reading confirmations have been saved."))
+    elif not errors:
+        messages.info(request, _("No confirmation changes were made."))
+
+    return redirect("required_reading:document_list")
+
+
+@login_required
+@require_POST
+def confirm_document(request, pk):
+    document = get_object_or_404(RequiredReadingDocument, pk=pk, is_active=True)
+    want_acknowledged = request.POST.get("acknowledged") == "1"
+    is_valid, error_message = validate_acknowledgement_request(
+        request.user,
+        document,
+        want_acknowledged,
+    )
+    if not is_valid:
+        messages.error(request, error_message)
+        return redirect("required_reading:open_document", pk=pk)
+
+    acknowledgement, _created = RequiredReadingAcknowledgement.objects.get_or_create(
+        user=request.user,
+        document=document,
+    )
+    acknowledgement.acknowledged = want_acknowledged
+    acknowledgement.save()
+
+    if want_acknowledged:
+        messages.success(request, _("Your reading confirmation has been saved."))
+    else:
+        messages.success(request, _("Your reading confirmation has been removed."))
+
     return redirect("required_reading:document_list")
 
 
@@ -208,7 +332,28 @@ def open_document(request, pk):
         document=document,
     )
     access.record_open()
-    return redirect(document.pdf_file.url)
+    acknowledgement = RequiredReadingAcknowledgement.objects.filter(
+        user=request.user,
+        document=document,
+    ).first()
+    is_acknowledged = bool(acknowledgement and acknowledgement.acknowledged)
+    remaining_seconds = get_confirmation_remaining_seconds(access)
+    return render(
+        request,
+        "required_reading/document_viewer.html",
+        {
+            "document": document,
+            "pdf_url": document.pdf_file.url,
+            "access": access,
+            "acknowledgement": acknowledgement,
+            "is_acknowledged": is_acknowledged,
+            "can_confirm": can_confirm_reading(access, is_acknowledged),
+            "confirmation_delay_seconds": READ_CONFIRMATION_DELAY_SECONDS,
+            "confirmation_remaining_seconds": remaining_seconds,
+            "can_manage_required_reading": is_required_reading_manager(request.user),
+            "required_reading_active_page": "documents",
+        },
+    )
 
 
 @staff_required

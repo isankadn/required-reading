@@ -1,6 +1,7 @@
 import csv
 import io
 import re
+from datetime import timedelta
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -281,13 +282,14 @@ def test_analytics_pages_include_download_csv_links(client):
     assert reverse("required_reading:analytics_document_export_csv", args=[document.id]).encode() in detail_response.content
 
 
-def test_open_document_tracks_access_and_redirects_to_pdf(client):
+def test_open_document_renders_viewer_and_tracks_access(client):
     user = create_user()
     document = RequiredReadingDocument.objects.create(title="Policy", pdf_file=make_pdf())
     client.force_login(user)
     response = client.get(reverse("required_reading:open_document", args=[document.id]))
-    assert response.status_code == 302
-    assert response["Location"].endswith(document.pdf_file.url)
+    assert response.status_code == 200
+    assert document.pdf_file.url.encode() in response.content
+    assert b"I confirm I have read this document" in response.content
     access = RequiredReadingDocumentAccess.objects.get(user=user, document=document)
     assert access.access_count == 1
 
@@ -296,18 +298,105 @@ def test_open_document_tracks_access_and_redirects_to_pdf(client):
     assert access.access_count == 2
 
 
-def test_user_can_save_own_acknowledgement(client):
+def test_confirm_document_requires_opening_pdf_first(client):
     user = create_user()
     document = RequiredReadingDocument.objects.create(title="Policy", pdf_file=make_pdf())
     client.force_login(user)
+    response = client.post(reverse("required_reading:confirm_document", args=[document.id]), {"acknowledged": "1"})
+    assert response.status_code == 302
+    assert RequiredReadingAcknowledgement.objects.filter(user=user, document=document, acknowledged=True).exists() is False
+
+
+def test_confirm_document_requires_thirty_second_delay(client):
+    user = create_user()
+    document = RequiredReadingDocument.objects.create(title="Policy", pdf_file=make_pdf())
+    client.force_login(user)
+    client.get(reverse("required_reading:open_document", args=[document.id]))
+    response = client.post(reverse("required_reading:confirm_document", args=[document.id]), {"acknowledged": "1"})
+    assert response.status_code == 302
+    assert RequiredReadingAcknowledgement.objects.filter(user=user, document=document, acknowledged=True).exists() is False
+
+
+def test_confirm_document_succeeds_after_delay(client):
+    user = create_user()
+    document = RequiredReadingDocument.objects.create(title="Policy", pdf_file=make_pdf())
+    client.force_login(user)
+    client.get(reverse("required_reading:open_document", args=[document.id]))
+    access = RequiredReadingDocumentAccess.objects.get(user=user, document=document)
+    access.last_accessed_at = timezone.now() - timedelta(seconds=31)
+    RequiredReadingDocumentAccess.objects.filter(pk=access.pk).update(
+        last_accessed_at=access.last_accessed_at,
+    )
+
+    response = client.post(reverse("required_reading:confirm_document", args=[document.id]), {"acknowledged": "1"})
+    assert response.status_code == 302
+    acknowledgement = RequiredReadingAcknowledgement.objects.get(user=user, document=document)
+    assert acknowledgement.acknowledged is True
+    assert acknowledgement.acknowledged_at is not None
+
+
+def test_already_confirmed_document_can_be_updated_without_delay(client):
+    user = create_user()
+    document = RequiredReadingDocument.objects.create(title="Policy", pdf_file=make_pdf())
+    RequiredReadingAcknowledgement.objects.create(
+        user=user,
+        document=document,
+        acknowledged=True,
+        acknowledged_at=timezone.now() - timedelta(days=1),
+    )
+    client.force_login(user)
+    response = client.post(reverse("required_reading:confirm_document", args=[document.id]))
+    assert response.status_code == 302
+    acknowledgement = RequiredReadingAcknowledgement.objects.get(user=user, document=document)
+    assert acknowledgement.acknowledged is False
+
+
+def test_save_acknowledgements_rejects_early_confirmation(client):
+    user = create_user()
+    document = RequiredReadingDocument.objects.create(title="Policy", pdf_file=make_pdf())
+    client.force_login(user)
+    client.get(reverse("required_reading:open_document", args=[document.id]))
     response = client.post(
         reverse("required_reading:save_acknowledgements"),
         {"acknowledged_documents": [str(document.id)]},
     )
     assert response.status_code == 302
+    assert RequiredReadingAcknowledgement.objects.filter(user=user, document=document, acknowledged=True).exists() is False
+
+
+def test_user_can_save_own_acknowledgement(client):
+    user = create_user()
+    document = RequiredReadingDocument.objects.create(title="Policy", pdf_file=make_pdf())
+    client.force_login(user)
+    client.get(reverse("required_reading:open_document", args=[document.id]))
+    access = RequiredReadingDocumentAccess.objects.get(user=user, document=document)
+    access.last_accessed_at = timezone.now() - timedelta(seconds=31)
+    RequiredReadingDocumentAccess.objects.filter(pk=access.pk).update(
+        last_accessed_at=access.last_accessed_at,
+    )
+    response = client.post(
+        reverse("required_reading:confirm_document", args=[document.id]),
+        {"acknowledged": "1"},
+    )
+    assert response.status_code == 302
     acknowledgement = RequiredReadingAcknowledgement.objects.get(user=user, document=document)
     assert acknowledgement.acknowledged is True
     assert acknowledgement.acknowledged_at is not None
+
+
+def test_document_list_shows_status_without_confirmation_checkbox(client):
+    user = create_user()
+    document = RequiredReadingDocument.objects.create(title="Policy", pdf_file=make_pdf())
+    client.force_login(user)
+    response = client.get(reverse("required_reading:document_list"))
+    assert response.status_code == 200
+    assert b"Open PDF first" in response.content
+    assert b'name="acknowledged_documents"' not in response.content
+    assert b"Save confirmations" not in response.content
+
+    client.get(reverse("required_reading:open_document", args=[document.id]))
+    response = client.get(reverse("required_reading:document_list"))
+    assert b"Opened" in response.content or b"confirm in PDF viewer" in response.content
 
 
 def test_staff_can_upload_pdf(client):

@@ -8,15 +8,18 @@
     </div>
   </div>
   <div class="rr-card-actions">
-    <a class="rr-button rr-button-secondary" href="{% url 'required_reading:open_document' row.document.id %}" target="_blank" rel="noopener noreferrer">
+    <a class="rr-button rr-button-secondary" href="{% url 'required_reading:open_document' row.document.id %}">
       {% trans "Open PDF" %}
     </a>
-    <label class="rr-checkbox-row">
-      <input type="checkbox" name="acknowledged_documents" value="{{ row.document.id }}" {% if row.is_acknowledged %}checked{% endif %}>
-      <span>{% trans "I confirm I have read this document" %}</span>
-    </label>
-    {% if row.acknowledgement.acknowledged_at %}
-      <small class="rr-confirmed-date">{% trans "Confirmed" %}: {{ row.acknowledgement.acknowledged_at|date:"M j, Y H:i" }}</small>
+    {% if row.is_acknowledged %}
+      <span class="rr-status-pill rr-status-yes">{% trans "Confirmed" %}</span>
+      {% if row.acknowledgement.acknowledged_at %}
+        <small class="rr-confirmed-date">{% trans "Confirmed" %}: {{ row.acknowledgement.acknowledged_at|date:"M j, Y H:i" }}</small>
+      {% endif %}
+    {% elif row.has_opened %}
+      <span class="rr-status-pill rr-status-waiting">{% trans "Opened — confirm in PDF viewer" %}</span>
+    {% else %}
+      <span class="rr-status-pill rr-status-no">{% trans "Open PDF first" %}</span>
     {% endif %}
   </div>
 </article>

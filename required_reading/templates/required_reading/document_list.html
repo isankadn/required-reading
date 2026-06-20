@@ -33,17 +33,11 @@
 </section>
 
 {% if document_rows %}
-<form method="post" action="{% url 'required_reading:save_acknowledgements' %}" class="rr-document-form">
-  {% csrf_token %}
   <div class="rr-document-grid">
     {% for row in document_rows %}
       {% include "required_reading/partials/document_card.html" with row=row %}
     {% endfor %}
   </div>
-  <div class="rr-sticky-actions">
-    <button type="submit" class="rr-button rr-button-primary">{% trans "Save confirmations" %}</button>
-  </div>
-</form>
 {% if document_page.has_other_pages %}
   <nav class="rr-pagination" aria-label="{% trans 'PDF document pages' %}">
     {% if document_page.has_previous %}

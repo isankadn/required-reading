@@ -1,0 +1,115 @@
+{% extends "required_reading/base.html" %}
+{% load i18n %}
+
+{% block required_reading_content %}
+<section class="rr-hero rr-hero-compact">
+  <div>
+    <p class="rr-eyebrow">{% trans "Required Reading" %}</p>
+    <h1>{{ document.title }}</h1>
+    <p>{% trans "Review the PDF below, then confirm once you have read it." %}</p>
+  </div>
+  <a class="rr-button rr-button-secondary" href="{% url 'required_reading:document_list' %}">{% trans "Back to documents" %}</a>
+</section>
+
+<section class="rr-panel rr-viewer-panel">
+  <div class="rr-pdf-viewer">
+    <object
+      class="rr-pdf-object"
+      data="{{ pdf_url }}"
+      type="application/pdf"
+      aria-label="{{ document.title }}"
+    >
+      <iframe
+        class="rr-pdf-frame"
+        src="{{ pdf_url }}"
+        title="{{ document.title }}"
+      ></iframe>
+    </object>
+  </div>
+  <p class="rr-viewer-fallback">
+    {% trans "If the PDF does not display, you can" %}
+    <a href="{{ pdf_url }}" target="_blank" rel="noopener noreferrer">{% trans "open it in a new tab" %}</a>.
+  </p>
+</section>
+
+<section class="rr-panel rr-viewer-actions">
+  <form method="post" action="{% url 'required_reading:confirm_document' document.id %}" class="rr-viewer-form">
+    {% csrf_token %}
+    <label class="rr-checkbox-row{% if not can_confirm and not is_acknowledged %} is-disabled{% endif %}">
+      <input
+        type="checkbox"
+        name="acknowledged"
+        value="1"
+        {% if is_acknowledged %}checked{% endif %}
+        {% if not can_confirm and not is_acknowledged %}disabled{% endif %}
+        data-rr-confirm-checkbox
+      >
+      <span>{% trans "I confirm I have read this document" %}</span>
+    </label>
+
+    {% if is_acknowledged %}
+      <p class="rr-viewer-status rr-viewer-status-confirmed">
+        {% if acknowledgement.acknowledged_at %}
+          {% blocktrans with confirmed_at=acknowledgement.acknowledged_at|date:"M j, Y H:i" %}Confirmed on {{ confirmed_at }}.{% endblocktrans %}
+        {% else %}
+          {% trans "You have already confirmed this document." %}
+        {% endif %}
+      </p>
+    {% elif can_confirm %}
+      <p class="rr-viewer-status rr-viewer-status-ready">{% trans "You can now confirm that you have read this document." %}</p>
+    {% else %}
+      <p class="rr-viewer-status rr-viewer-status-waiting" data-rr-countdown data-remaining="{{ confirmation_remaining_seconds }}">
+        {% blocktrans with seconds=confirmation_remaining_seconds %}Confirmation unlocks in {{ seconds }} seconds.{% endblocktrans %}
+      </p>
+    {% endif %}
+
+    <div class="rr-viewer-form-actions">
+      <button
+        type="submit"
+        class="rr-button rr-button-primary"
+        data-rr-confirm-submit
+        {% if not can_confirm and not is_acknowledged %}disabled{% endif %}
+      >
+        {% trans "Save confirmation" %}
+      </button>
+    </div>
+  </form>
+</section>
+{% endblock %}
+
+{% block required_reading_js %}
+<script>
+(function () {
+  var countdown = document.querySelector("[data-rr-countdown]");
+  var checkbox = document.querySelector("[data-rr-confirm-checkbox]");
+  var submitButton = document.querySelector("[data-rr-confirm-submit]");
+  if (!countdown || !checkbox || !submitButton) {
+    return;
+  }
+
+  var remaining = parseInt(countdown.getAttribute("data-remaining") || "0", 10);
+  if (remaining <= 0) {
+    return;
+  }
+
+  function unlockConfirmation() {
+    checkbox.disabled = false;
+    submitButton.disabled = false;
+    countdown.classList.remove("rr-viewer-status-waiting");
+    countdown.classList.add("rr-viewer-status-ready");
+    countdown.textContent = "{% filter escapejs %}{% trans 'You can now confirm that you have read this document.' %}{% endfilter %}";
+    checkbox.closest(".rr-checkbox-row").classList.remove("is-disabled");
+  }
+
+  var timer = window.setInterval(function () {
+    remaining -= 1;
+    if (remaining <= 0) {
+      window.clearInterval(timer);
+      unlockConfirmation();
+      return;
+    }
+    countdown.textContent = "{% filter escapejs %}{% blocktrans with seconds='__SECONDS__' %}Confirmation unlocks in {{ seconds }} seconds.{% endblocktrans %}{% endfilter %}".replace("__SECONDS__", remaining);
+  }, 1000);
+})();
+</script>
+{% endblock %}

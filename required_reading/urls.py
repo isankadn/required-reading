@@ -8,6 +8,7 @@ urlpatterns = [
     path("required-reading/", views.document_list, name="document_list"),
     path("required-reading/save/", views.save_acknowledgements, name="save_acknowledgements"),
     path("required-reading/document/<int:pk>/open/", views.open_document, name="open_document"),
+    path("required-reading/document/<int:pk>/confirm/", views.confirm_document, name="confirm_document"),
     path("required-reading/manage/", views.manage_documents, name="manage_documents"),
     path("required-reading/manage/analytics/", views.analytics, name="analytics"),
     path("required-reading/manage/analytics/export.csv", views.analytics_export_csv, name="analytics_export_csv"),
