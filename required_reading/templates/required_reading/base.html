@@ -38,6 +38,7 @@
 
 {% block bodyextra %}
   {{ block.super }}
+  <script src="{% static 'js/header/header.js' %}"></script>
   <script src="{% static 'required_reading/js/required_reading.js' %}"></script>
   {% block required_reading_js %}{% endblock %}
 {% endblock %}
